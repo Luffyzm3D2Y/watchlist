@@ -1,8 +1,9 @@
 from flask import Flask, render_template
-from flask import url_for
+from flask import url_for,request,redirect,flash
 from flask_sqlalchemy import SQLAlchemy
 from markupsafe import  escape
 import click
+
 import os
 
 app=Flask(__name__)
@@ -16,7 +17,7 @@ app.config['SQLALCHEMY_DATABASE_URI']='mysql+pymysql://root:yzm@localhost:3306/d
 #dbOne是通过mysql为该项目建立的数据库
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS']=False #关闭对模型修改的监控
 #在扩展类实例化之前修改加载配置
-
+app.config['SECRET_KEY']='dev'
 db=SQLAlchemy(app) #import扩展类并初始化扩展，传入实例app
 
 #__name__是一个全局变量，随着脚本执行或模块的引入而改变
@@ -55,7 +56,7 @@ class Movie(db.Model):
 
 #注册 请求处理函数（view function）
 #Web程序可以看作一堆视图函数的集合，编写不同的view function来处理对应的url请求
-@app.route('/')
+@app.route('/',methods=['GET','POST'])
 def index():
     """
     当访问指定url规则时会出发该函数，获取返回值并把返回值显示到浏览器窗口
@@ -69,7 +70,25 @@ def index():
 
     f'<h1>Hello Flask!!!</h1><img src="http://helloflask.com/totoro.gif">'
 
+    if request.method=='POST':
+        #从request中获取表单数据
+        title=request.form.get("title")
+        year=request.form.get("year")
+        #验证数据
+        if not title or not year or len(year)>4 or len(title)>60:
+            flash("Invalid input.")
+            #flash()在内部会把消息存储在session对象中，
+            #session用于在请求见存储数据，会把数据签名后存储在浏览器的cookie中
+            #因此需要设置签名所需的密钥
+            #display message to user.
+            return redirect(url_for('index'))
 
+        #保存表单数据
+        movie=Movie(title=title,year=year)
+        db.session.add(movie)
+        db.session.commit()
+        flash("Item created.")
+        return redirect(url_for("index"))
 
     movies=Movie.query.all()
     """
@@ -79,6 +98,40 @@ def index():
     render_template()调用后执行模板里所有的Jinja2语句并返回渲染好的模板内容
     """
     return render_template('index.html',movies=movies)
+
+@app.route('/movie/edit/<int:movie_id>',methods=['GET','POST'])
+def edit(movie_id):
+    movie=Movie.query.get_or_404(movie_id)
+
+    if request.method=='POST': #处理编辑页面表单的提交请求
+        title=request.form['title']
+        year=request.form['year']
+
+        if not title or not year or len(year)!=4 or len(title)>60:
+            flash("Invalid input.")
+            return redirect(url_for('edit'),movie_id=movie_id)
+        movie.title=title
+        movie.year=year
+        db.session.commit() #提交数据库会话
+        flash('Item updated.')
+        return redirect(url_for('index')) #重定向回主页
+
+    return render_template('edit.html',movie=movie) #渲染编辑页面的模板
+
+@app.route('/movie/delete/<int:movie_id>',methods=['POST'])
+def delete(movie_id):
+    """
+    为了安全考虑，一般会使用 POST请求 提交 删除请求，使用表单而非链接来实现删除
+    :param movie_id:
+    :return:
+    """
+    movie=Movie.query.get_or_404(movie_id)
+    db.session.delete(movie)
+    db.session.commit()
+    flash('Item deleted.')
+    return redirect(url_for('index'))
+
+
 @app.route('/user/<name>')
 def user_page(name):
     return f'User:{escape(name)}'

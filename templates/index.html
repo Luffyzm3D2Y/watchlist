@@ -3,11 +3,24 @@
 <!--默认在block中是重写（覆盖之前的内容），如果需要追加，可以{{super()}}-->
 {#使用 length 过滤器获取 movies 变量的长度#}
     <p>{{movies|length}} Titles</p>
+    <form method="post">
+        <label for="name">Name</label>
+        <input type="text" name="title" autocomplete="off" id="name" required>
+        <label for="year">Year</label>
+        <input type="text" name="year" autocomplete="off" id="year" required>
+        <!--autocomplete 自动完成，关闭则点击输入框不会显示历史记录-->
+        <!--required 表示如果没有输入内容按下提交会显示错误提示-->
+        <input class="btn" type="submit" name="submit" value="Add">
+    </form>
     <ul class="movie-list">
         {% for movie in movies%}{# 迭代movies变量#}
         <li>
             {{movie.title}}-{{movie.year}}
             <span class="float-right">
+                <a class="btn" href="{{url_for('edit',movie_id=movie.id)}}">Edit</a>
+                <form class="inline-form" method="post" action="{{url_for('delete',movie_id=movie.id)}}">
+                    <input class="btn" type="submit" name="delete" value="Delete" onclick="return confirm('Are you sure?')">
+                </form>
                 <a class="imdb" href="https://www.imdb.com/find?q={{movie.title}}" target="_blank" title="Find this movie on IMDb">IMDb</a>
             </span>
         </li> {# 等同于movie{'title'}#}

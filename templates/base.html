@@ -1,6 +1,10 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    {% for message in get_flashed_messages()%}
+        <div class="alert">{{message}}</div>
+    {% endfor %}
+
     {% block head %}
     <!-- 定义block,方便子模版重写或添加-->
     <meta charset="utf-8">
