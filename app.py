@@ -70,7 +70,7 @@ def index():
     f'<h1>Hello Flask!!!</h1><img src="http://helloflask.com/totoro.gif">'
 
 
-    user=User.query.first()
+
     movies=Movie.query.all()
     """
     render_template()用于渲染模板，传入参数有：
@@ -78,7 +78,7 @@ def index():
     通过关键字参数传入模板内部使用的变量
     render_template()调用后执行模板里所有的Jinja2语句并返回渲染好的模板内容
     """
-    return render_template('index.html',user=user,movies=movies)
+    return render_template('index.html',movies=movies)
 @app.route('/user/<name>')
 def user_page(name):
     return f'User:{escape(name)}'
@@ -102,6 +102,27 @@ def test_url_for():
 #访问http://localhost:5000 or http://127.0.0.1:5000
 #flask默认把程序存储在名为app.py或wsgi.py的文件中
 #如果要使用其他名称需要设置 系统环境变量 FLASK_APP 为要启动的程序名
+
+@app.errorhandler(404)
+def page_not_found(e):
+    """
+    和视图函数类似，收到错误或异常时，该函数触发执行。
+    :param e:
+    :return:
+    """
+
+    return render_template('404.html'),404
+#返回响应主体，状态码
+@app.context_processor
+def inject_user():
+    """
+    上下文处理函数，该函数的返回值（以字典键值对的形式）将会统一注入到
+    模板的上下文环境中，因此返回值中的变量可以直接在模板中使用
+    :return:
+    """
+    user=User.query.first()
+    return dict(user=user)
+
 
 @app.cli.command()
 def forge():
