@@ -1,0 +1,14 @@
+{% extends 'base.html'%}
+{% block content%}
+<h3>Login</h3>
+<form method="post">
+ <label for="username">Username</label>
+        <input type="text" name="username" autocomplete="off" id="username" required >
+  <label for="password">Password</label>
+        <input type="password" name="password" autocomplete="off" id="password" required >
+        <!--autocomplete 自动完成，关闭则点击输入框不会显示历史记录-->
+        <!--required 表示如果没有输入内容按下提交会显示错误提示-->
+        <input class="btn" type="submit" name="submit" value="Submit">
+        <!--submit btn，点击后提交表单发送post请求，默认发送请求的url是网页的url(有触发请求发送的作用)-->
+</form>
+{% endblock%}

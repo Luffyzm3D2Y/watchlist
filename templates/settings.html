@@ -1,0 +1,10 @@
+{% extends 'base.html'%}
+{% block content%}
+<h3>Settings</h3>
+<form method="post">
+ <label for="name">Your Name</label>
+        <input type="text" name="name" autocomplete="off" id="name" required value="{{current_user.name}}">
+        <input class="btn" type="submit" name="submit" value="Save">
+        <!--submit btn，点击后提交表单发送post请求，默认发送请求的url是网页的url(有触发请求发送的作用)-->
+</form>
+{% endblock%}

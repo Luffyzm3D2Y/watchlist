@@ -3,7 +3,8 @@ from flask import url_for,request,redirect,flash
 from flask_sqlalchemy import SQLAlchemy
 from markupsafe import  escape
 import click
-
+from werkzeug.security import generate_password_hash,check_password_hash
+from flask_login import LoginManager,UserMixin,login_user,logout_user,login_required,current_user
 import os
 
 app=Flask(__name__)
@@ -20,8 +21,27 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS']=False #关闭对模型修改的监�
 app.config['SECRET_KEY']='dev'
 db=SQLAlchemy(app) #import扩展类并初始化扩展，传入实例app
 
+
+#对于初始化扩展Flask-login，不仅需要实例化扩展类，还需要实现一个用户加载回调函数
+login_manager=LoginManager(app)
+login_manager.login_view='login'
+#开启视图保护后，若未登录并访问被保护的视图，会重定向回login_view并发出错误提示
+@login_manager.user_loader#用户加载回调函数
+def load_user(user_id):
+    """
+    实现 用户加载回调函数
+    接受 用户 id作为参数
+    返回值是用户id对应的用户模型类记录
+    Flask-login提供了一个current_user变量，
+    运行程序后，current_user变量的值回事当前用户的用户模型类记录
+    :param user_id:
+    :return:
+    """
+    user=User.query.get(int(user_id))
+    return user
+
 #__name__是一个全局变量，随着脚本执行或模块的引入而改变
-class User(db.Model):
+class User(db.Model,UserMixin):
     """
     创建数据库模型
     模型类和字段
@@ -36,6 +56,13 @@ class User(db.Model):
     """
     id=db.Column(db.Integer,primary_key=True)
     name=db.Column(db.String(20))
+    username=db.Column(db.String(20))
+    password_hash=db.Column(db.String(128))
+    def set_password(self,password):
+        self.password_hash=generate_password_hash(password)
+    def validate_password(self,password):
+        return check_password_hash(self.password_hash,password)
+
 class Movie(db.Model):
     id=db.Column(db.Integer,primary_key=True)
     title=db.Column(db.String(60))
@@ -71,6 +98,8 @@ def index():
     f'<h1>Hello Flask!!!</h1><img src="http://helloflask.com/totoro.gif">'
 
     if request.method=='POST':
+        if not current_user.is_authenticated:
+            return redirect(url_for('index'))
         #从request中获取表单数据
         title=request.form.get("title")
         year=request.form.get("year")
@@ -98,8 +127,34 @@ def index():
     render_template()调用后执行模板里所有的Jinja2语句并返回渲染好的模板内容
     """
     return render_template('index.html',movies=movies)
+@app.route('/login',methods=['GET','POST'])
+def login():
+    if request.method=='POST':
+        username=request.form['username']
+        password=request.form['password']
+        if not username or not password:
+            flash('Invalid input.')
+            return redirect(url_for('login'))
+        user=User.query.first()
+        if username==user.username and user.validate_password(password):
+            login_user(user)#登入用户
+            flash('Login success.')
+            return redirect(url_for('index'))
+        flash('Invalid username or password.')
+        return redirect(url_for('login'))
+
+    return render_template('login.html')
+
+@app.route('/logout')
+@login_required #用于视图保护
+def logout():
+    logout_user()
+    flash('Goodbye.')
+    return redirect(url_for('index'))
+
 
 @app.route('/movie/edit/<int:movie_id>',methods=['GET','POST'])
+@login_required
 def edit(movie_id):
     movie=Movie.query.get_or_404(movie_id)
 
@@ -119,6 +174,7 @@ def edit(movie_id):
     return render_template('edit.html',movie=movie) #渲染编辑页面的模板
 
 @app.route('/movie/delete/<int:movie_id>',methods=['POST'])
+@login_required
 def delete(movie_id):
     """
     为了安全考虑，一般会使用 POST请求 提交 删除请求，使用表单而非链接来实现删除
@@ -131,6 +187,20 @@ def delete(movie_id):
     flash('Item deleted.')
     return redirect(url_for('index'))
 
+@app.route('/setting',methods=['GET','POST'])
+@login_required
+def setting():
+    if request.method=='POST':
+        name=request.form['name']
+        if not name or len(name)>20:
+            flash('Invalid input.')
+            return redirect(url_for('setting'))
+        current_user.name=name
+        db.session.commit()
+        flash('Setting Updated.')
+        return redirect(url_for('index'))
+
+    return render_template('setting.html')
 
 @app.route('/user/<name>')
 def user_page(name):
@@ -205,6 +275,31 @@ def forge():
         db.session.add(movie)
     db.session.commit()
     click.echo("Done.")
+
+@app.cli.command()
+@click.option('--username',prompt=True,help='The username used to login.')
+@click.option('--password',prompt=True,hide_input=True,confirmation_prompt=True,help='The password used to login.')
+#prompt=True 表示会有提示参数输入，confirmation_prompt 表示会有提示重新输入以确认
+def admin(username,password):
+    """
+    通过命令行创建管理员账户，若之前账户存在则更新账号和密码
+    :param username:
+    :param password:
+    :return:
+    """
+    """creat user."""
+    user=User.query.first()
+    if user is not None:
+        user.username=username
+        user.set_password(password)
+    else:
+        click.echo("Creating user...")
+        user=User(username=username,name='Admin')
+        user.set_password(password)
+        db.session.add(user)
+    db.session.commit()
+    click.echo("Done.")
+
 
 if __name__=="__main__":
     db.drop_all()
